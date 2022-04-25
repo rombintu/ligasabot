@@ -166,7 +166,7 @@ def checker(message, var):
     if text == str(var["vars"][var["ans"]-1]):
         t = content.rigth
     else:
-        t = content.noRight.format(str(var["ans"]))
+        t = content.noRight.format(str(var["vars"][var["ans"]-1]))
     keyboard.row("Обучение", "Викторина")
     bot.send_message(user_id, t, reply_markup=keyboard)
 
