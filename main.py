@@ -59,7 +59,7 @@ def handle_message_start(message):
     text = message.text
     user_id = message.chat.id
     keyboard = types.ReplyKeyboardMarkup()
-    keyboard.row("Стартуем!")
+    keyboard.row(choice(content.starts_buttons))
     bot.send_message(
         user_id, 
         content.start_message, 
@@ -100,11 +100,9 @@ def sudo_chage_mode(message):
     bot.register_next_step_handler(message, change_mode)
 
 def change_mode(message):
-    text = message.text
-    user_id = message.chat.id
-    mem.change_mode(text)
+    mem.change_mode(message.text)
     mem.refresh()
-    bot.send_message(user_id, content.done_message, reply_markup=types.ReplyKeyboardRemove())
+    bot.send_message(message.chat.id, content.done_message, reply_markup=types.ReplyKeyboardRemove())
 
 def add_questions(message):
     text = message.text

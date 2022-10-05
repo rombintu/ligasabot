@@ -8,7 +8,10 @@ change_mode = "Выбери раздел на который хочешь пер
 rigth = "Верно"
 noRight = "Не правильно, верный ответ: {}"
 database_is_empty = "{} пуст, обратитесь к администратору"
+
 example_var = [
     {"ask":"hello?" , "vars": [1,2,3,4], "ans": 1},
     {"ask":"bye?" , "vars": [5,6,7,8], "ans": 6}
 ]
+
+starts_buttons = ["docker-compose up", "systemctl start my.service", "make run"]
