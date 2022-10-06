@@ -10,5 +10,5 @@ def validate(json_content):
     for ct in content:
         keys = ct.keys()
         vict = "ask" and "vars" and "ans" in keys
-        study = "content" and "url" in keys 
+        study = "content" and "url" and "title" in keys 
     return study, vict

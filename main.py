@@ -1,4 +1,5 @@
-import os
+from http import client
+import os, sys
 
 import telebot
 from telebot import types
@@ -7,22 +8,55 @@ from random import choice
 import requests, json
 import content
 from pymongo import MongoClient
-import pymongo
 
 from tools import json_validate
 
 load_dotenv()
+
 API_TOKEN = os.getenv('TOKEN')
+CONNECTION_STRING = os.getenv("CONNECTION_STRING")
+
+if API_TOKEN == None or CONNECTION_STRING == None:
+    print("env vars TOKEN or CONNECTION_STRING is None")
+    sys.exit(1)
+
 bot = telebot.TeleBot(API_TOKEN, parse_mode=None)
+
+class Database:
+    db = MongoClient(CONNECTION_STRING)[content.userdb]
+    def login_check(self, user_id):
+        return self.db.table.find_one({"user_id": str(user_id)})
+
+    def sign_up(self, message):
+        try:
+            self.db.table.insert_one({
+                    "user_id": str(message.chat.id),
+                    "nick": str(message.text),
+                    "statistics": {
+                        "failed": []
+                    }
+                }
+            )
+            bot.reply_to(message, content.reg_ok)
+        except:
+            bot.reply_to(message, content.database_problems)
+
+    def update_faileds(self, user_id, faileds):
+        self.db.table.update_one(
+            {"user_id": str(user_id)},
+            {"$set": {
+                "failed": faileds
+                }, 
+            }, upsert=False)
 
 class InMemory:
     # Key - отображение имени в боте
     # Value - название базы данных
-    modes = {"1 раздел":"bot", "2 раздел":"glava_2"}
+    modes = {"1 раздел":"test1", "2 раздел":"glava_2", "3 глава": "day3"}
 
     # Нужна для обработки ошибок
     cur_mode = list(modes.keys())[0]
-    db = MongoClient(os.getenv("CONNECTION_STRING"))[modes[cur_mode]]
+    db = MongoClient(CONNECTION_STRING)[modes[cur_mode]]
     vict = []
     study = []
 
@@ -36,7 +70,7 @@ class InMemory:
 
     def change_mode(self, mode):
         self.cur_mode = mode
-        self.db = MongoClient(os.getenv("CONNECTION_STRING"))[self.modes[self.cur_mode]]
+        self.db = MongoClient(CONNECTION_STRING)[self.modes[self.cur_mode]]
 
     def concat_vict(self, json_content):
         content = json.loads(json_content.decode("utf-8"))
@@ -50,18 +84,19 @@ class InMemory:
             content = [content]
         self.db.study.insert_many(content)
 
+# GLOBAL START
 mem = InMemory()
 mem.refresh()
 
+users = Database()
+# GLOBAL END
 
 @bot.message_handler(commands=['start'])
 def handle_message_start(message):
-    text = message.text
-    user_id = message.chat.id
     keyboard = types.ReplyKeyboardMarkup()
     keyboard.row(choice(content.starts_buttons))
     bot.send_message(
-        user_id, 
+        message.chat.id, 
         content.start_message, 
         reply_markup=keyboard
     )
@@ -127,25 +162,53 @@ def add_questions(message):
     else:
         bot.send_message(user_id, content.return_message)
 
+@bot.message_handler(commands=['edu'])
+def handle_message(message):
+    text = message.text
+    user_id = message.chat.id
+
+    keyboard = types.ReplyKeyboardMarkup()
+    try:
+        for v in mem.study:
+            keyboard.row(str(v["title"]))
+    except:
+        pass
+    bot.send_message(user_id, content.select_themes, reply_markup=keyboard)
+
 @bot.message_handler(content_types=["text"])
 def handle_message(message):
     text = message.text
     user_id = message.chat.id
+
+    user_info = users.login_check(user_id)
+    if not user_info:
+        bot.send_message(user_id, content.not_reg)
+        bot.register_next_step_handler(message, users.sign_up)
+        return
+
     keyboard = types.ReplyKeyboardMarkup()
     try:
-        study = choice(mem.study)
+        # study = choice(mem.study)
         vict = choice(mem.vict)
     except IndexError:
         bot.send_message(user_id, content.database_is_empty.format(mem.cur_mode))
         return
 
-    if text == "Обучение":
-        keyboard.row("Обучение", "Викторина")
-        bot.send_message(
-            user_id, 
-            f'{study["content"]}\nСсылка: {study["url"]}', 
-            reply_markup=keyboard
-        )
+    for st in mem.study:
+        try:
+            if text == st["title"]:
+                keyboard.row("Викторина")
+                bot.send_message(
+                    user_id, 
+                    f'{st["content"]}\nСсылка: {st["url"]}', 
+                    reply_markup=keyboard
+                )
+                return
+        except Exception as e:
+            bot.send_message(
+                    user_id, 
+                    f'Error: {str(e)}\nПинганите администратора'
+                )
     else:
         for v in vict["vars"]:
             keyboard.row(str(v))
@@ -154,9 +217,9 @@ def handle_message(message):
             vict["ask"], 
             reply_markup=keyboard
         )
-        bot.register_next_step_handler(message, checker, vict)
+        bot.register_next_step_handler(message, checker, vict, user_info["statistics"]["failed"])
 
-def checker(message, var):
+def checker(message, var, failed_list):
     text = message.text
     user_id = message.chat.id
     keyboard = types.ReplyKeyboardMarkup()
@@ -165,7 +228,11 @@ def checker(message, var):
         t = content.rigth
     else:
         t = content.noRight.format(str(var["vars"][var["ans"]-1]))
-    keyboard.row("Обучение", "Викторина")
+        failed_list.append(var["ask"])
+        users.update_faileds(user_id, failed_list)
+        print(failed_list)
+
+    keyboard.row("Викторина")
     bot.send_message(user_id, t, reply_markup=keyboard)
 
 def main():
