@@ -1,14 +1,14 @@
-from http import client
 import os, sys
-
 import telebot
+
 from telebot import types
 from dotenv import load_dotenv
 from random import choice
+
 import requests, json
 import content
-from pymongo import MongoClient
 
+from pymongo import MongoClient
 from tools import json_validate
 
 load_dotenv()
@@ -32,20 +32,19 @@ class Database:
             self.db.table.insert_one({
                     "user_id": str(message.chat.id),
                     "nick": str(message.text),
-                    "statistics": {
-                        "failed": []
-                    }
+                    "faileds": [],
+                    "rights": [],
                 }
             )
             bot.reply_to(message, content.reg_ok)
         except:
             bot.reply_to(message, content.database_problems)
 
-    def update_faileds(self, user_id, faileds):
+    def update(self, user_id, failed, field="failed"):
         self.db.table.update_one(
             {"user_id": str(user_id)},
-            {"$set": {
-                "failed": faileds
+            {"$push": {
+                field: failed
                 }, 
             }, upsert=False)
 
@@ -164,7 +163,6 @@ def add_questions(message):
 
 @bot.message_handler(commands=['edu'])
 def handle_message(message):
-    text = message.text
     user_id = message.chat.id
 
     keyboard = types.ReplyKeyboardMarkup()
@@ -179,20 +177,16 @@ def handle_message(message):
 def handle_message(message):
     text = message.text
     user_id = message.chat.id
-
     user_info = users.login_check(user_id)
     if not user_info:
         bot.send_message(user_id, content.not_reg)
         bot.register_next_step_handler(message, users.sign_up)
         return
 
+    rights = user_info["rights"]
+    vict = None
     keyboard = types.ReplyKeyboardMarkup()
-    try:
-        # study = choice(mem.study)
-        vict = choice(mem.vict)
-    except IndexError:
-        bot.send_message(user_id, content.database_is_empty.format(mem.cur_mode))
-        return
+    
 
     for st in mem.study:
         try:
@@ -210,6 +204,25 @@ def handle_message(message):
                     f'Error: {str(e)}\nПинганите администратора'
                 )
     else:
+        try:
+            keys = []
+            for v in mem.vict:
+                keys.append(v["ask"])
+
+            vict_key = choice(list(set(keys) - set(rights))) # Убираем вопросы на которые уже ответили
+
+            for v in mem.vict: # TODO
+                if v["ask"] == vict_key:
+                    vict = v
+
+        except IndexError:
+            bot.send_message(user_id, content.database_is_empty.format(mem.cur_mode))
+            return
+        
+        if not vict:
+            bot.send_message(user_id, content.database_is_empty.format(mem.cur_mode))
+            return
+
         for v in vict["vars"]:
             keyboard.row(str(v))
         bot.send_message(
@@ -217,20 +230,19 @@ def handle_message(message):
             vict["ask"], 
             reply_markup=keyboard
         )
-        bot.register_next_step_handler(message, checker, vict, user_info["statistics"]["failed"])
+        bot.register_next_step_handler(message, checker, vict)
 
-def checker(message, var, failed_list):
+def checker(message, var):
     text = message.text
     user_id = message.chat.id
     keyboard = types.ReplyKeyboardMarkup()
     t = ""
     if text == str(var["vars"][var["ans"]-1]):
         t = content.rigth
+        users.update(user_id, var["ask"], field="rights")
     else:
         t = content.noRight.format(str(var["vars"][var["ans"]-1]))
-        failed_list.append(var["ask"])
-        users.update_faileds(user_id, failed_list)
-        print(failed_list)
+        users.update(user_id, var["ask"], field="faileds")
 
     keyboard.row("Викторина")
     bot.send_message(user_id, t, reply_markup=keyboard)
