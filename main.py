@@ -49,13 +49,12 @@ class Database:
             }, upsert=False)
 
 class InMemory:
-    # Key - отображение имени в боте
-    # Value - название базы данных
-    modes = {"1 раздел":"test1", "2 раздел":"glava_2", "3 глава": "day3"}
+    # modes = content.modes
+    modes = [f"day{i}" for i in range(1, 13)]
 
     # Нужна для обработки ошибок
-    cur_mode = list(modes.keys())[0]
-    db = MongoClient(CONNECTION_STRING)[modes[cur_mode]]
+    cur_mode = modes[0]
+    db = MongoClient(CONNECTION_STRING)[cur_mode]
     vict = []
     study = []
 
@@ -69,7 +68,7 @@ class InMemory:
 
     def change_mode(self, mode):
         self.cur_mode = mode
-        self.db = MongoClient(CONNECTION_STRING)[self.modes[self.cur_mode]]
+        self.db = MongoClient(CONNECTION_STRING)[self.cur_mode]
 
     def concat_vict(self, json_content):
         content = json.loads(json_content.decode("utf-8"))
@@ -164,8 +163,11 @@ def add_questions(message):
 @bot.message_handler(commands=['edu'])
 def handle_message(message):
     user_id = message.chat.id
-
     keyboard = types.ReplyKeyboardMarkup()
+    if len(mem.study) == 0:
+        keyboard.row(content.get_rand_vict)
+        bot.send_message(user_id, content.database_study_is_empty.format(mem.cur_mode))
+        return
     try:
         for v in mem.study:
             keyboard.row(str(v["title"]))
@@ -191,7 +193,7 @@ def handle_message(message):
     for st in mem.study:
         try:
             if text == st["title"]:
-                keyboard.row("Викторина")
+                keyboard.row("Получить рандомный вопрос")
                 bot.send_message(
                     user_id, 
                     f'{st["content"]}\nСсылка: {st["url"]}', 
@@ -201,7 +203,7 @@ def handle_message(message):
         except Exception as e:
             bot.send_message(
                     user_id, 
-                    f'Error: {str(e)}\nПинганите администратора'
+                    f'Error: {str(e)}\nПингани администратора'
                 )
     else:
         try:
@@ -244,7 +246,7 @@ def checker(message, var):
         t = content.noRight.format(str(var["vars"][var["ans"]-1]))
         users.update(user_id, var["ask"], field="faileds")
 
-    keyboard.row("Викторина")
+    keyboard.row("Получить рандомный вопрос")
     bot.send_message(user_id, t, reply_markup=keyboard)
 
 def main():
