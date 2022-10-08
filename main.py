@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, time
 import telebot
 
 from telebot import types
@@ -28,6 +28,8 @@ class Database:
         return self.db.table.find_one({"user_id": str(user_id)})
 
     def sign_up(self, message):
+        keyboard = types.ReplyKeyboardMarkup()
+        keyboard.row(choice(content.starts_buttons))
         try:
             self.db.table.insert_one({
                     "user_id": str(message.chat.id),
@@ -36,7 +38,7 @@ class Database:
                     "rights": [],
                 }
             )
-            bot.reply_to(message, content.reg_ok)
+            bot.reply_to(message, content.reg_ok, reply_markup=keyboard)
         except:
             bot.reply_to(message, content.database_problems)
 
@@ -92,7 +94,7 @@ users = Database()
 @bot.message_handler(commands=['start'])
 def handle_message_start(message):
     keyboard = types.ReplyKeyboardMarkup()
-    keyboard.row(choice(content.starts_buttons))
+    # keyboard.row(choice(content.starts_buttons))
     bot.send_message(
         message.chat.id, 
         content.start_message, 
@@ -101,9 +103,14 @@ def handle_message_start(message):
 
 @bot.message_handler(commands=['sudo'])
 def handle_message_sudo(message):
-    user_id = message.chat.id
-    bot.send_message(user_id, content.sudo_message)
+    bot.send_message(message.chat.id, content.sudo_message)
     bot.register_next_step_handler(message, sudo_add_content)
+
+@bot.message_handler(commands=['help'])
+def handle_message_sudo(message):
+    keyboard = types.ReplyKeyboardMarkup()
+    keyboard.row(choice(content.starts_buttons))
+    bot.send_message(message.chat.id, content.help_message, reply_markup=keyboard)
 
 @bot.message_handler(commands=['mode'])
 def handle_message_mode(message):
@@ -181,7 +188,10 @@ def handle_message(message):
     user_id = message.chat.id
     user_info = users.login_check(user_id)
     if not user_info:
-        bot.send_message(user_id, content.not_reg)
+        keyboard = types.ReplyKeyboardRemove()
+        for msg in content.not_reg:
+            bot.send_message(user_id, msg, reply_markup=keyboard)
+            time.sleep(1)
         bot.register_next_step_handler(message, users.sign_up)
         return
 
@@ -240,10 +250,10 @@ def checker(message, var):
     keyboard = types.ReplyKeyboardMarkup()
     t = ""
     if text == str(var["vars"][var["ans"]-1]):
-        t = content.rigth
+        t = choice(content.rigth)
         users.update(user_id, var["ask"], field="rights")
     else:
-        t = content.noRight.format(str(var["vars"][var["ans"]-1]))
+        t = choice(content.noRight) + "\nПравильный ответ: " + (str(var["vars"][var["ans"]-1]))
         users.update(user_id, var["ask"], field="faileds")
 
     keyboard.row("Получить рандомный вопрос")
