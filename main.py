@@ -9,7 +9,7 @@ import requests, json
 import content
 
 from pymongo import MongoClient
-from tools import json_validate
+from tools import json_validate, utils
 
 load_dotenv()
 
@@ -55,7 +55,7 @@ class InMemory:
     modes = [f"day{i}" for i in range(1, 13)]
 
     # Нужна для обработки ошибок
-    cur_mode = modes[0]
+    cur_mode = utils.read_day(default=modes[0])
     db = MongoClient(CONNECTION_STRING)[cur_mode]
     vict = []
     study = []
@@ -71,6 +71,7 @@ class InMemory:
     def change_mode(self, mode):
         self.cur_mode = mode
         self.db = MongoClient(CONNECTION_STRING)[self.cur_mode]
+        utils.write_day(mode)
 
     def concat_vict(self, json_content):
         content = json.loads(json_content.decode("utf-8"))
