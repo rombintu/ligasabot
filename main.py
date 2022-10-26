@@ -25,13 +25,13 @@ bot = telebot.TeleBot(API_TOKEN, parse_mode=None)
 class Database:
     db = MongoClient(CONNECTION_STRING)[content.userdb]
     def login_check(self, user_id):
-        return self.db.table.find_one({"user_id": str(user_id)})
+        return self.db.table_new.find_one({"user_id": str(user_id)})
 
     def sign_up(self, message):
         keyboard = types.ReplyKeyboardMarkup()
         keyboard.row(choice(content.starts_buttons))
         try:
-            self.db.table.insert_one({
+            self.db.table_new.insert_one({
                     "user_id": str(message.chat.id),
                     "nick": str(message.text),
                     "faileds": [],
@@ -43,7 +43,7 @@ class Database:
             bot.reply_to(message, content.database_problems)
 
     def update(self, user_id, failed, field="failed"):
-        self.db.table.update_one(
+        self.db.table_new.update_one(
             {"user_id": str(user_id)},
             {"$push": {
                 field: failed
