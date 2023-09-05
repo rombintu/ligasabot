@@ -60,7 +60,7 @@ class Google_Sheets:
 
     def parse_data_by_day(self, day=1):
         payload = []
-        error = None
+        errors = []
         try:
             service = build('sheets', 'v4', credentials=self.creds)
 
@@ -74,6 +74,7 @@ class Google_Sheets:
                 elif len(row) != 3: 
                     print("Size row is not 3")
                     continue
+                
                 vars = []
                 ans = -1
                 try: 
@@ -81,6 +82,11 @@ class Google_Sheets:
                     ans = int(row[2])
                 except Exception as err:
                     print(err)
+                    errors.append(err)
+
+                if ans -1  > len(vars):
+                    errors.append(f"Некоторый ответ не подходит, проверь таблицу [{row[0]}]")
+                    continue
 
                 payload.append({
                     "ask": row[0],
@@ -88,5 +94,5 @@ class Google_Sheets:
                     "ans": ans
                 })
         except HttpError as err:
-            error = err
-        return payload, error
+            errors.append(err)
+        return payload, errors

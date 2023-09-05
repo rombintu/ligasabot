@@ -69,11 +69,11 @@ class InMemory:
 
     def refresh(self):
         self.vict = []
-        vict, err = google_sheet.parse_data_by_day(self.cur_mode)
-        if not err:
-            self.vict = vict
-        else:
-            print(err)
+        vict, errors = google_sheet.parse_data_by_day(self.cur_mode)
+        if errors:
+            return errors
+        self.vict = vict
+        return None
 
     def change_mode(self, mode):
         self.cur_mode = mode
@@ -122,8 +122,11 @@ def sudo_chage_mode(message):
 
 def change_mode(message):
     mem.change_mode(message.text)
-    mem.refresh()
-    bot.send_message(message.chat.id, content.done_message, reply_markup=types.ReplyKeyboardRemove())
+    errors = mem.refresh()
+    if not errors:
+        bot.send_message(message.chat.id, content.done_message, reply_markup=types.ReplyKeyboardRemove())
+    else:
+        bot.send_message(message.chat.id, "Не удалось выполнить, тк есть ошибки\n" + "\n".join(errors), reply_markup=types.ReplyKeyboardRemove())
 
 @bot.message_handler(content_types=["text"])
 def handle_message(message):
